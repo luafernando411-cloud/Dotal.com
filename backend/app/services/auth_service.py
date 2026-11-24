@@ -5,7 +5,6 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,12 +26,14 @@ from app.dtos.auth_dto import (
 from app.models.access_log_model import AccessLog
 from app.models.admin_model import Admin
 from app.models.user_model import User
+from app.repositories.access_log_repository import AccessLogRepository
 from app.repositories.admin_repository import AdminRepository
 from app.repositories.user_repository import UserRepository
 
 
 user_repository = UserRepository()
 admin_repository = AdminRepository()
+access_log_repository = AccessLogRepository()
 logger = logging.getLogger(__name__)
 
 
@@ -113,8 +114,7 @@ def record_access(
         success=success,
         event=event,
     )
-    db.add(entry)
-    db.commit()
+    access_log_repository.add(db, entry)
     if not success:
         logger.warning(
             "auth_event",
@@ -169,39 +169,11 @@ def update_user_status(db: Session, user_id: str, account_status: str) -> AdminU
 
 def get_admin_metrics(db: Session) -> AdminMetricsDTO:
     since = datetime.now(timezone.utc) - timedelta(hours=24)
-    total = int(db.scalar(select(func.count()).select_from(User).where(User.cpf.is_not(None))) or 0)
-    active = int(
-        db.scalar(
-            select(func.count()).select_from(User).where(User.cpf.is_not(None), User.status == "active")
-        )
-        or 0
-    )
-    blocked = int(
-        db.scalar(
-            select(func.count()).select_from(User).where(User.cpf.is_not(None), User.status == "blocked")
-        )
-        or 0
-    )
-    failed = int(
-        db.scalar(
-            select(func.count()).select_from(AccessLog).where(
-                AccessLog.success.is_(False),
-                AccessLog.event == "login",
-                AccessLog.occurred_at >= since,
-            )
-        )
-        or 0
-    )
-    succeeded = int(
-        db.scalar(
-            select(func.count()).select_from(AccessLog).where(
-                AccessLog.success.is_(True),
-                AccessLog.event == "login",
-                AccessLog.occurred_at >= since,
-            )
-        )
-        or 0
-    )
+    total = user_repository.count_registered_users(db)
+    active = user_repository.count_registered_users(db, status="active")
+    blocked = user_repository.count_registered_users(db, status="blocked")
+    failed = access_log_repository.count_since(db, success=False, since=since)
+    succeeded = access_log_repository.count_since(db, success=True, since=since)
     return AdminMetricsDTO(
         total_users=total,
         active_users=active,
@@ -212,9 +184,7 @@ def get_admin_metrics(db: Session) -> AdminMetricsDTO:
 
 
 def list_access_logs(db: Session, *, limit: int) -> list[AccessLogDTO]:
-    records = db.scalars(
-        select(AccessLog).order_by(AccessLog.occurred_at.desc()).limit(limit)
-    ).all()
+    records = access_log_repository.list_latest(db, limit=limit)
     return [AccessLogDTO.model_validate(record) for record in records]
 
 

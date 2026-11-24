@@ -47,3 +47,9 @@ class UserRepository:
         count_statement = select(func.count()).select_from(User).where(*conditions)
         statement = statement.order_by(User.created_at.desc()).limit(limit).offset(offset)
         return list(db.scalars(statement).all()), int(db.scalar(count_statement) or 0)
+
+    def count_registered_users(self, db: Session, *, status: str | None = None) -> int:
+        statement = select(func.count()).select_from(User).where(User.cpf.is_not(None))
+        if status:
+            statement = statement.where(User.status == status)
+        return int(db.scalar(statement) or 0)
