@@ -20,8 +20,23 @@ npm run preview
 
 O aplicativo inclui boas-vindas, acesso, primeiro cadastro, validação OTP, formulário em quatro etapas e confirmação com protocolo. O rascunho do censo e a preferência de tema são salvos no `localStorage`.
 
-O painel do gestor está disponível em `/admin` e oferece três modelos selecionáveis: visão executiva/territorial, observabilidade/performance e qualidade/auditoria. A seleção do modelo é persistida no `localStorage`; os filtros globais afetam os indicadores, gráficos, mapa, filas e exportação CSV. A visão executiva abre o mapa de Acesso a Oportunidades do IPEA, com opção de alternar para o mapa regional filtrável do Censo. O fluxo do recenseado permanece em `/`.
+O painel do gestor tem acesso dedicado em `/admin/login` (e cadastro provisionado em `/admin/register`) e oferece visão executiva, segurança/acessos e qualidade/auditoria. O fluxo do recenseado permanece em `/`.
 
-O formulário inclui validação de CPF, etapas de vínculo e endereço, consulta mockada de CEP com preenchimento manual alternativo, mapa regional, dependentes e anexos com pré-visualização e validação de formato/tamanho. Os dados cadastrais e nomes dos anexos integram o rascunho local; por segurança, arquivos binários devem ser selecionados novamente após recarregar a página. O envio prepara um `FormData` em `buildCensusFormData` para integrar com uma API `multipart/form-data`.
+O formulário inclui validação de CPF, etapas de vínculo e endereço, consulta de CEP com preenchimento manual alternativo, dependentes e anexos com pré-visualização e validação de formato/tamanho. O login, cadastro e envio de censo usam a API configurada por `VITE_API_URL`.
 
-As operações em `src/services/` são mock assíncronos, prontos para conexão REST. A consulta de CEP usa dados demonstrativos e uma inferência regional aproximada, podendo ser substituída pelo provedor oficial. No fluxo de demonstração, qualquer credencial não vazia e qualquer código OTP de quatro dígitos são aceitos.
+## Pipeline E2E Playwright
+
+A pipeline sobe uma API isolada em SQLite e o Vite, descobre rotas/estados SPA, executa fluxos de autenticação e autorização, audita chamadas HTTP e produz evidências e relatórios em `artifacts/`.
+
+```sh
+npm ci
+python -m pip install -r ../backend/requirements.txt
+npx playwright install chromium
+npm run test:pipeline
+```
+
+`npm run test:e2e` executa os testes sem limpar o banco E2E; `npm run test:e2e:ui` abre a interface do Playwright. Para usar serviços externos, configure `BASE_URL`, `API_BASE_URL`, `E2E_START_SERVERS=false` e `E2E_ADMIN_REGISTRATION_KEY`; use sempre um backend isolado e descartável, pois os cenários gravam usuários e tentativas de login.
+
+Saídas principais: `artifacts/map-routes.json`, `artifacts/html-report/` (HTML interativo nativo), `artifacts/reports/e2e-report.{html,json,md}`, `artifacts/videos/`, `artifacts/screenshots/` e `artifacts/traces/`. O interceptor registra método, URL, status, latência e headers de cache/rate-limit; senhas, tokens, e-mails e CPFs nunca são gravados como valores. Respostas `5xx` e falhas de transporte reprovam o teste.
+
+O workflow `.github/workflows/e2e.yml` executa a mesma pipeline em pull requests e pushes.

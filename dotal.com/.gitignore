@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+artifacts/
+playwright-e2e.db
 
 # Editor directories and files
 .vscode/*
