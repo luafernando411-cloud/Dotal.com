@@ -25,13 +25,7 @@ python -m app.create_admin
 uvicorn app.main:app --reload
 ```
 
-O Compose sobe somente PostgreSQL e Redis. O `init.sql` cria as tabelas e insere dez contatos fictícios de demonstração em `fake_contacts` no primeiro volume. O FastAPI cria tabelas ausentes e adiciona as colunas de autenticação necessárias em bancos existentes; contas administrativas antigas são migradas para `admins`. Defina `CENSUS_ADMIN_REGISTRATION_KEY` com uma chave aleatória para habilitar `/admin/register`; sem ela, novos cadastros administrativos ficam desativados. `python -m app.create_admin` provisiona/atualiza uma conta administrativa por CLI. Não use senhas de exemplo em produção.
-
-Se o volume do PostgreSQL já existia antes da alteração, aplique o SQL uma vez manualmente (ajuste usuário e banco se forem diferentes dos valores padrão):
-
-```bash
-docker compose exec -T postgres psql -U census -d census < init.sql
-```
+O Compose sobe somente PostgreSQL e Redis. O `init.sql` cria as tabelas e insere dez contatos fictícios de demonstração em `fake_contacts` no primeiro volume. O FastAPI cria tabelas ausentes e adiciona as colunas de autenticação necessárias em bancos existentes; contas administrativas antigas são migradas para `admins` no startup. Não reaplique `init.sql` em volumes existentes: a migração de esquema é feita pela API. Defina `CENSUS_ADMIN_REGISTRATION_KEY` com uma chave aleatória (por exemplo, `python -c "import secrets; print(secrets.token_urlsafe(32))"`) para habilitar `/admin/register`; sem ela, novos cadastros administrativos ficam desativados. `python -m app.create_admin` provisiona/atualiza uma conta administrativa por CLI. Não use senhas de exemplo em produção.
 
 Configure `CENSUS_CORS_ORIGINS` com a origem exata do frontend. No Vite, defina `VITE_API_URL=http://localhost:8000`. O exemplo de React está em `/api-example`; o acesso administrativo fica em `/admin/login` e o cadastro com chave em `/admin/register`.
 
@@ -55,7 +49,7 @@ Configure `CENSUS_CORS_ORIGINS` com a origem exata do frontend. No Vite, defina 
 | `PATCH /api/admin/census/{id}/status` | Somente admin |
 | `PATCH /api/admin/census/{id}/steps/{step}/review` | Somente admin |
 
-O usuário envia `cpf` (11 dígitos ou formato `000.000.000-00`), `fullName`, `email` e `password` no cadastro. CPF é validado matematicamente e gravado apenas com dígitos. Administradores são guardados em tabela separada e usam rotas e token próprios. Os logins aplicam bloqueio progressivo por IP e identificador com Redis (fallback em memória), e eventos guardam somente hashes de CPF/e-mail e IP. Listagens administrativas têm cache curto invalidado em alterações.
+O usuário envia `cpf` (11 dígitos ou formato `000.000.000-00`), `fullName`, `email` e `password` no cadastro. A senha comum exige 8+ caracteres com letras e números; a administrativa exige 12+ caracteres, maiúscula, minúscula, número e símbolo. CPF é validado matematicamente e gravado apenas com dígitos. Administradores são guardados em tabela separada e usam rotas e token próprios. Os logins aplicam bloqueio progressivo por IP e identificador com Redis (fallback em memória), e eventos guardam somente hashes protegidos por chave de CPF/e-mail e IP. Listagens administrativas têm cache curto invalidado em alterações.
 
 `/docs`, `/redoc` e `/openapi.json` ficam desativados quando `CENSUS_ENVIRONMENT=production`. O JWT expira em 30 minutos por padrão. O detector limita requisições por minuto e observa respostas repetidas `401`, `403` e `422`. Para conectar escala vertical, `CENSUS_SCALE_HOOK` pode apontar para um executável absoluto, confiável e de propriedade da operação; ele recebe apenas o motivo como argumento, sem shell, timeout de 5 segundos e cooldown global de 60 segundos. Sem hook configurado (padrão local), a API registra um incidente estruturado e continua com rate limit/bloqueio, sem executar comandos.
 
@@ -67,6 +61,7 @@ O usuário envia `cpf` (11 dígitos ou formato `000.000.000-00`), `fullName`, `e
 - Com token admin em `/api/admin/dashboard`: deve responder `200`.
 - `POST /api/auth/register` recebe CPF, nome, e-mail e senha; não aceita `role`.
 - `POST /api/admin/auth/register` sem a chave correta: deve responder `403`.
+- Testes DTO: `cd backend && PYTHONPATH=. python -m unittest discover -s tests -v`.
 
 O frontend guarda o JWT em `localStorage` neste exemplo. A API sempre valida o token e o tipo de conta; esconder a tela no React não substitui essa validação. Para uma aplicação com dados sensíveis, prefira cookies `HttpOnly`, `Secure` e `SameSite` após definir a estratégia de sessão.
 

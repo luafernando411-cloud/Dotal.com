@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Icon } from '../components/ui/index.jsx'
 import { DashboardModelSwitcher } from '../components/admin/DashboardModelSwitcher.jsx'
 import { ExecutiveDashboardModel } from '../components/admin/ExecutiveDashboardModel.jsx'
-import { ObservabilityDashboardModel } from '../components/admin/ObservabilityDashboardModel.jsx'
+import { AdminSecurityDashboardModel } from '../components/admin/AdminSecurityDashboardModel.jsx'
 import { AuditQualityDashboardModel } from '../components/admin/AuditQualityDashboardModel.jsx'
 import {
   dashboardOptions,
@@ -18,7 +18,7 @@ import './AdminDashboardScreen.css'
 const modelIds = ['executive', 'observability', 'quality']
 const modelTitles = {
   executive: 'Visão executiva e territorial',
-  observability: 'Observabilidade e performance',
+  observability: 'Segurança e acessos',
   quality: 'Qualidade de dados e auditoria',
 }
 const statusClass = { Pendente: 'pending', 'Em Revisão': 'review', Concluído: 'complete' }
@@ -42,7 +42,7 @@ function formatDate(date) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(date))
 }
 
-export function AdminDashboardScreen({ theme, onThemeChange, onReturn, onLogout }) {
+export function AdminDashboardScreen({ theme, adminEmail, onThemeChange, onReturn, onLogout }) {
   const [records, setRecords] = useState([])
   const [metrics, setMetrics] = useState(null)
   const [lastSync, setLastSync] = useState(null)
@@ -81,17 +81,9 @@ export function AdminDashboardScreen({ theme, onThemeChange, onReturn, onLogout 
   useEffect(() => {
     const initialLoadTimer = window.setTimeout(() => loadData(), 0)
     const refreshTimer = window.setInterval(() => loadData(), 30_000)
-    const sessionTimer = window.setInterval(() => {
-      setMetrics((current) => current ? {
-        ...current,
-        latency: 78 + Math.floor(Math.random() * 65),
-        activeSessions: 42 + Math.floor(Math.random() * 12),
-      } : current)
-    }, 5_000)
     return () => {
       window.clearTimeout(initialLoadTimer)
       window.clearInterval(refreshTimer)
-      window.clearInterval(sessionTimer)
     }
   }, [loadData])
 
@@ -148,7 +140,7 @@ export function AdminDashboardScreen({ theme, onThemeChange, onReturn, onLogout 
       <header className="admin-topbar">
         <div className="admin-topbar-brand">
           <div className="admin-brand-mark"><Icon name="shield" size={23} /></div>
-          <div><strong>Painel do Gestor</strong><span>Observabilidade do Censo</span></div>
+          <div><strong>Painel do Gestor</strong><span>Contas, acessos e registros</span></div>
         </div>
         <div className="admin-topbar-actions">
           <button type="button" className="admin-top-button admin-return-button" onClick={onReturn} data-testid="return-to-census">
@@ -178,7 +170,7 @@ export function AdminDashboardScreen({ theme, onThemeChange, onReturn, onLogout 
           <button type="button" className="admin-nav-item" onClick={() => document.getElementById('users-section')?.scrollIntoView({ behavior: 'smooth' })}><Icon name="users" size={18} /> Usuários e acessos</button>
           <div className="admin-sidebar-spacer" />
           <div className="admin-sidebar-status"><span className="online-indicator" /><span><strong>Sistema operacional</strong><small>Sincronização automática</small></span></div>
-          <div className="admin-user"><div className="admin-user-avatar">GM</div><div><strong>Gestor Municipal</strong><small>Administrador</small></div><Icon name="logout" size={17} /></div>
+          <div className="admin-user"><div className="admin-user-avatar">{adminEmail?.slice(0, 2).toUpperCase() || 'AD'}</div><div><strong>{adminEmail || 'Administrador'}</strong><small>Administrador</small></div><Icon name="logout" size={17} /></div>
         </aside>
 
         <section className="admin-main">
@@ -192,10 +184,9 @@ export function AdminDashboardScreen({ theme, onThemeChange, onReturn, onLogout 
               <span className="health-icon"><Icon name="activity" size={20} /></span>
               <span><small>STATUS DA API</small><strong><span className="online-indicator" />{metrics?.apiStatus || 'Conectando'}</strong></span>
             </div>
-            <Metric icon="clock" label="LATÊNCIA MÉDIA" value={metrics ? `${metrics.latency} ms` : '—'} />
-            <Metric icon="activity" label="DISPONIBILIDADE SLA" value={metrics ? `${metrics.availability.toFixed(2)}%` : '—'} />
+            <Metric icon="clock" label="LATÊNCIA DE CONSULTA" value={metrics ? `${metrics.latency} ms` : '—'} />
             <Metric icon="refresh" label="ÚLTIMA SINCRONIZAÇÃO" value={formatTime(lastSync)} />
-            <Metric icon="users" label="LOGINS EM 24H" value={metrics?.activeSessions ?? '—'} />
+            <Metric icon="users" label="LOGINS EM 24H" value={metrics?.logins24h ?? '—'} />
             <Metric icon="users" label="USUÁRIOS" value={metrics?.totalUsers ?? '—'} />
             <Metric icon="info" label="CONTAS BLOQUEADAS" value={metrics?.blockedUsers ?? '—'} />
             <Metric icon="info" label="FALHAS DE LOGIN / 24H" value={metrics?.failedLogins ?? '—'} />
@@ -221,7 +212,7 @@ export function AdminDashboardScreen({ theme, onThemeChange, onReturn, onLogout 
           {error && <div className="admin-error" role="alert"><Icon name="info" size={16} />{error}<button type="button" onClick={() => setError('')} aria-label="Fechar aviso"><Icon name="close" size={15} /></button></div>}
 
           {model === 'executive' && <ExecutiveDashboardModel records={filteredRecords} regionRecords={regionIndependentRecords} selectedRegion={regionFilter} onRegionSelect={setRegionFilter} />}
-          {model === 'observability' && <ObservabilityDashboardModel />}
+          {model === 'observability' && <AdminSecurityDashboardModel />}
           {model === 'quality' && <AuditQualityDashboardModel records={filteredRecords} onOpenRecord={setSelectedRecord} onStatusChange={changeStatus} />}
 
           <RecordsTable records={filteredRecords} loading={loading} onStatusChange={changeStatus} onOpenRecord={setSelectedRecord} onClearFilters={() => { setSearch(''); setStatusFilter('Todos'); setCategoryFilter('Todas'); setRegionFilter('') }} lastSync={lastSync} />

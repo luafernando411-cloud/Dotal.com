@@ -3,8 +3,6 @@ import { apiRequest } from './apiClient.js'
 const regions = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul']
 const categories = ['Ativo', 'Aposentado', 'Pensionista']
 const statuses = ['Concluído', 'Em Revisão', 'Pendente']
-const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
-
 export async function fetchDashboardData() {
   const startedAt = performance.now()
   const [census, metrics] = await Promise.all([
@@ -33,8 +31,7 @@ export async function fetchDashboardData() {
     metrics: {
       apiStatus: 'Operacional',
       latency: Math.round(performance.now() - startedAt),
-      availability: 100,
-      activeSessions: metrics.successful_logins_24h,
+      logins24h: metrics.successful_logins_24h,
       totalUsers: metrics.total_users,
       blockedUsers: metrics.blocked_users,
       failedLogins: metrics.failed_logins_24h,
@@ -75,6 +72,10 @@ export function fetchAdminUsers({ search = '', status = '', limit = 10, offset =
   return apiRequest(`/api/admin/users?${params}`)
 }
 
+export function fetchAdminMetrics() {
+  return apiRequest('/api/admin/metrics')
+}
+
 export function updateAdminUserStatus(userId, status) {
   return apiRequest(`/api/admin/users/${encodeURIComponent(userId)}/status`, {
     method: 'PATCH',
@@ -90,49 +91,6 @@ function formatCpf(value = '') {
   const digits = value.replace(/\D/g, '')
   if (digits.length !== 11) return '***.***.***-**'
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
-}
-
-const telemetryRanges = {
-  '15m': { points: 15, duration: 15 * 60_000 },
-  '1h': { points: 12, duration: 60 * 60_000 },
-  '24h': { points: 24, duration: 24 * 60 * 60_000 },
-  '7d': { points: 28, duration: 7 * 24 * 60 * 60_000 },
-}
-
-function telemetryLabel(date, range) {
-  if (range === '7d') return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(date)
-  if (range === '24h') return `${String(date.getHours()).padStart(2, '0')}h`
-  return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(date)
-}
-
-export async function fetchTelemetryData(range = '15m') {
-  const config = telemetryRanges[range]
-  if (!config) throw new Error('Janela de telemetria inválida.')
-  await pause(150)
-  const now = Date.now()
-  const series = Array.from({ length: config.points }, (_, index) => {
-    const progress = index / Math.max(config.points - 1, 1)
-    const timestamp = new Date(now - config.duration * (1 - progress))
-    return {
-      timestamp: timestamp.toISOString(),
-      label: telemetryLabel(timestamp, range),
-      latency: Math.round(108 + Math.sin(index * 0.83) * 21 + Math.cos(index * 0.37) * 9 + Math.random() * 10),
-      requests: Math.round(260 + Math.sin(index * 0.57) * 65 + Math.cos(index * 0.29) * 30 + Math.random() * 24),
-      errors: Number(Math.max(0.05, 0.48 + Math.sin(index * 0.74) * 0.25 + Math.random() * 0.28).toFixed(2)),
-    }
-  })
-
-  return {
-    range,
-    sampledAt: new Date().toISOString(),
-    series,
-    services: [
-      { name: 'Autenticação OTP', latency: 92, uptime: 99.99, health: 'Operacional' },
-      { name: 'Consulta de CEP', latency: 218, uptime: 99.87, health: 'Atenção' },
-      { name: 'Submissão do Censo', latency: 136, uptime: 99.96, health: 'Operacional' },
-      { name: 'Persistência / Base de Dados', latency: 34, uptime: 99.99, health: 'Operacional' },
-    ],
-  }
 }
 
 export function getDataQuality(recordsToInspect) {

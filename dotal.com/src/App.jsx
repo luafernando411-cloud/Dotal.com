@@ -163,6 +163,7 @@ function CensusApp() {
     return (
       <AdminDashboardScreen
         theme={theme}
+        adminEmail={session.user.email}
         onThemeChange={changeTheme}
         onReturn={() => navigate('/')}
         onLogout={() => { clearApiSession(); setSession(null); navigate('/') }}

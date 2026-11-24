@@ -2,7 +2,7 @@ import { Icon } from '../ui/index.jsx'
 
 const models = [
   { id: 'executive', title: 'Executiva e territorial', icon: 'chart', number: '01' },
-  { id: 'observability', title: 'Observabilidade e performance', icon: 'activity', number: '02' },
+  { id: 'observability', title: 'Segurança e acessos', icon: 'shield', number: '02' },
   { id: 'quality', title: 'Qualidade e auditoria', icon: 'shield', number: '03' },
 ]
 
